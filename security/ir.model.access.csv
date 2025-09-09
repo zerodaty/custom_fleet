@@ -3,3 +3,4 @@ access_fleet_service_product_line_user,fleet.service.product.line.user,model_fle
 access_product_category_fleet_user,product.category for fleet user,product.model_product_category,base.group_user,1,0,0,0
 access_fleet_vehicle_insurance_user,fleet.vehicle.insurance.user,model_fleet_vehicle_insurance,base.group_user,1,1,1,1
 access_res_partner_category_user,res.partner.category for internal user,base.model_res_partner_category,base.group_user,1,0,0,0
+access_fleet_workshop_stage_user,fleet.workshop.stage.user,model_fleet_workshop_stage,base.group_user,1,1,1,1

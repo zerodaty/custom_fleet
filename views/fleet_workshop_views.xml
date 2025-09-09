@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    
+    <!-- 1. LA VISTA KANBAN PARA EL TALLER -->
+    <record id="view_fleet_vehicle_kanban_workshop" model="ir.ui.view">
+        <field name="name">fleet.vehicle.kanban.workshop.view</field>
+        <field name="model">fleet.vehicle</field>
+        <field name="mode">primary</field>
+        <field name="arch" type="xml">
+            <!-- Nuestro Kanban agrupado por nuestras etapas de taller -->
+            <kanban default_group_by="workshop_stage_id" class="o_kanban_mobile" archivable="false">
+                <!-- Referenciamos TODOS los campos que vamos a usar en la tarjeta -->
+                <field name="workshop_stage_id"/>
+                <field name="image_128"/>
+                <field name="model_id"/>
+                <field name="license_plate"/>
+                <field name="tag_ids"/>
+                <field name="customer_id"/>
+                <field name="driver_id"/>
+                <field name="priority"/>
+                <field name="active_service_count"/>
+                <field name="contract_count"/>
+                <field name="contract_renewal_due_soon"/>
+                <field name="contract_renewal_overdue"/>
+            
+                <!-- LA PLANTILLA COMPLETA DE LA TARJETA -->
+                <templates>
+                    <!-- Odoo 18 prefiere que la plantilla se llame 'card' -->
+                    <t t-name="card" class="flex-row">
+                        <aside class="d-flex align-items-center me-2">
+                            <field name="image_128" widget="image" options="{'img_class': 'object-fit-cover'}"/>
+                        </aside>
+                        <main>
+                            <div>
+                                <t t-if="record.license_plate.raw_value">
+                                    <field class="fw-bolder fs-5" name="license_plate"/>:
+                                </t>
+                                <field class="fw-bolder fs-5" name="model_id"/>
+                            </div>
+                            <field name="tag_ids" widget="many2many_tags" options="{'color_field': 'color'}"/>
+                        
+                            <!-- Nuestro enriquecimiento -->
+                            <div class="mt-1 d-flex justify-content-between align-items-center">
+                                <field name="workshop_stage_id" widget="badge"/>
+                                <field name="priority" widget="priority"/>
+                            </div>
+                            
+                            <field t-if="record.driver_id.raw_value" name="driver_id" widget="many2one_avatar" options="{'display_avatar_name': True}" class="small pt-1 pb-1"/>
+                            
+                            <div t-if="record.customer_id.raw_value" class="small pt-1 pb-1">
+                                <i class="fa fa-briefcase me-1" title="Propietario"/>
+                                <field name="customer_id" widget="many2one_avatar" options="{'display_avatar_name': True}"/>
+                            </div>
+                            
+                            <!-- El pie de la tarjeta con nuestros botones -->
+                            <footer class="pt-0 mt-0" t-if="!selection_mode">
+                                <div class="d-flex fs-6 align-items-center">
+                                    <a t-if="record.contract_count.raw_value > 0" type="object"
+                                        name="return_action_to_open" href="#" data-context='{"xml_id":"fleet_vehicle_log_contract_action"}'>
+                                        <field name="contract_count"/> Contrato(s)
+                                        <span t-if="record.contract_renewal_due_soon.raw_value and !record.contract_renewal_overdue.raw_value" class="fa fa-exclamation-triangle text-warning" title="El contrato vence pronto"/>
+                                        <span t-if="record.contract_renewal_overdue.raw_value" class="fa fa-exclamation-triangle text-danger" title="Contrato vencido"/>
+                                    </a>
+                                    <a t-if="record.active_service_count.raw_value > 0" class="ms-3" type="object" name="action_open_services" href="#">
+                                        <i class="fa fa-wrench me-1" title="Servicios activos"/>
+                                        <field name="active_service_count"/> Servicio(s)
+                                    </a>
+                                    <!-- La prioridad ya no está en el footer -->
+                                </div>
+                            </footer>
+                        </main>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!-- 2. LA ACCIÓN DE VENTANA QUE ABRE EL KANBAN DEL TALLER -->
+    <record id="action_workshop_board" model="ir.actions.act_window">
+        <field name="name">Tablero de Taller</field>
+        <field name="res_model">fleet.vehicle</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="view_id" ref="fleet_product.view_fleet_vehicle_kanban_workshop"/>
+        <field name="help" type="html">
+          <p class="o_view_nocontent_smiling_face">¡Bienvenido a tu tablero de taller!</p>
+          <p>Aquí verás todos los vehículos organizados por su estado operativo actual.</p>
+        </field>
+    </record>
+
+    <!-- 3. LOS MENÚS PARA ACCEDER -->
+    <record id="menu_workshop_root" model="ir.ui.menu">
+        <field name="name">Taller</field>
+        <field name="parent_id" ref="fleet.menu_root"/>
+        <field name="sequence">10</field>
+    </record>
+    
+    <record id="menu_workshop_board_action" model="ir.ui.menu">
+        <field name="name">Tablero de Taller</field>
+        <field name="parent_id" ref="menu_workshop_root"/>
+        <field name="action" ref="action_workshop_board"/>
+        <field name="sequence">1</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <record id="fleet_vehicle_state_available" model="fleet.workshop.stage">
+            <field name="name">Patio / Disponible</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="fleet_vehicle_state_diagnosis" model="fleet.workshop.stage">
+            <field name="name">Diagnóstico</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="fleet_vehicle_state_in_workshop" model="fleet.workshop.stage">
+            <field name="name">En Taller</field>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="fleet_vehicle_state_ready" model="fleet.workshop.stage">
+            <field name="name">Listo para Entrega</field>
+            <field name="sequence">40</field>
+        </record>
+        
+        <record id="fleet_vehicle_state_sold" model="fleet.workshop.stage">
+            <field name="name">Desincorporado</field>
+            <field name="sequence">99</field>
+        </record>
+
+    </data>
+</odoo>

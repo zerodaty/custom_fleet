@@ -9,6 +9,7 @@ class FleetVehicleInsurance(models.Model):
     como los seguros temporales asociados a futuros alquileres.
     """
     _name = 'fleet.vehicle.insurance'
+    _inherit = ['mail.thread', 'mail.activity.mixin']
     _description = 'Póliza de Seguro de Vehículo'
     _order = 'end_date desc, name' # Ordenar por defecto, las más nuevas primero
 
@@ -19,7 +20,8 @@ class FleetVehicleInsurance(models.Model):
         required=True,
         )
     active = fields.Boolean(
-        default=True
+        default=True,
+        tracking = True
         ) # Para archivar pólizas vencidas
 
     policy_type = fields.Selection(
@@ -35,20 +37,25 @@ class FleetVehicleInsurance(models.Model):
     insurer_id = fields.Many2one(
         'res.partner', 
         string='Aseguradora',
-        required=True
+        required=True,
+        tracking = True
     )
 
-    vehicle_id = fields.Many2one('fleet.vehicle', string='Vehículo Asegurado', required=True)
+    vehicle_id = fields.Many2one(
+        'fleet.vehicle',
+        string='Vehículo Asegurado',
+        required=True,
+        tracking = True
+    )
 
     # --- Campos de Vigencia y Costo ---
     
     start_date = fields.Date(string='Fecha de Inicio', required=True)
     end_date = fields.Date(string='Fecha de Vencimiento', required=True)
     
-    # Este currency_id lo necesitará el campo cost.
     currency_id = fields.Many2one(
         'res.currency', 
-        related='vehicle_id.currency_id', # Heredamos la moneda del vehículo
+        related='vehicle_id.currency_id',
         store=True
     )
     cost = fields.Monetary(string='Costo de la Póliza')

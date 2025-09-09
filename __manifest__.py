@@ -22,8 +22,9 @@
             'data/fleet_product_categories.xml',
             'data/fleet_product_productos.xml',
             'data/fleet_product_service.xml',
-            'data/fleet_vehicle_state_data.xml',
+            'data/fleet_workshop_stage_data.xml',
             # ~ # views
+            'views/fleet_workshop_views.xml',
             'views/fleet_vehicle_log_services_views.xml',
             'views/fleet_vehicle_insurance_views.xml',
             'views/fleet_vehicle_view.xml',

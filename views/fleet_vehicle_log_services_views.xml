@@ -7,11 +7,6 @@
         <field name="priority" eval='99' />
         <field name="arch" type="xml">
 
-            <!-- BLOQUEO DEL FORMULARIO UNA VEZ CREADO EL PRESUPUESTO == FALTA IMPLEMENTAR == -->
-
-            
-            <!-- Arreglitos sencillos pal form MODOFICACION 1.0 agregar fotico y el domain-->
-
             <xpath expr="//field[@name='purchaser_id']" position="attributes">
                 <attribute name="string">Contacto del Servicio</attribute>
                 <attribute name="invisible">1</attribute>
@@ -25,10 +20,6 @@
                 <field name="purchaser_id" widget="many2one_avatar"/>
             </xpath>
             
-            <!--
-                AÑADIR EL CONTENEDOR PARA LOS BOTONES INTELIGENTES
-                Lo insertamos justo al inicio del <sheet>
-            -->
             <xpath expr="//div[hasclass('oe_button_box')]" position="inside">
                 <button class="oe_stat_button" name="action_view_sale_orders" type="object" icon="fa-pencil-square-o" invisible="sale_order_count == 0">
                     <div class="o_field_widget o_stat_info">
@@ -40,8 +31,6 @@
                 </button>
             </xpath>
 
-            <!-- GESTIÓN DE BOTONES EN LA CABECERA Y STATUSBAR -->
-            <!-- Apuntamos a la cabecera para añadir nuestros botones y modificar la barra de estado. -->
             <xpath expr="//header" position="inside">
                 <!-- Botón de Presupuesto -->
                 <button name="action_create_sale_orders" string="Crear presupuesto" type="object" class="btn-primary" icon="fa-shopping-cart" invisible="state not in ['new', 'running'] or sale_order_id != False"/>
@@ -55,7 +44,6 @@
                 <attribute name="options">{}</attribute>
             </xpath>
 
-            <!-- CAMPOS NUEVOS Y MODIFICACIONES -->
             <xpath expr="//field[@name='service_type_id']" position="after">
                 <field name="service_classification"/>
             </xpath>
@@ -80,7 +68,7 @@
                         <field name="product_line_ids">
                             <list string="Productos" editable="bottom">
                                 <field name="product_id" domain="[('categ_id', 'child_of', categ_id), ('type', '!=', 'service')]" required="1"/>
-                                <field name="categ_id" invisible="1"/>
+                                <field name="categ_id" readonly="1"/>
                                 <field name="quantity" string="Cant."/>
                                 <field name="price_unit" string="Precio Unitario"/>
                                 <field name="currency_id" invisible="1"/>
@@ -92,7 +80,7 @@
                 </notebook>
             </xpath>
 
-            <!-- 5. Campos de Seguro -->
+            <!--  Campos de Seguro -->
             <xpath expr="//group[1]" position="after">
                 <group string="Detalles del Seguro" name="insurance_details" invisible="vehicle_id_has_active_policies == False">
                     <field name="insurance_policy_id" domain="[('vehicle_id', '=', vehicle_id), ('policy_type', '=', 'owner'), ('end_date', '>=', date)]" context="{'default_vehicle_id': vehicle_id}"/>
@@ -122,7 +110,7 @@
             <!-- Añadimos el campo de contrato dentro de la sección de Seguros para agruparlo todo -->
             <xpath expr="//group[@name='insurance_details']" position="inside">
                 <field name="contract_id"/>
-                <fiel name="analytic_account_id" invisible="1"/>
+                <field name="analytic_account_id" invisible="1"/>
             </xpath>
         </field>
     </record>

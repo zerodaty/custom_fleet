@@ -2,9 +2,8 @@
 from odoo.tests.common import TransactionCase, Form
 from odoo.exceptions import UserError
 from datetime import date, timedelta
-from odoo.fields import Command # Necesitamos importar Command
+from odoo.fields import Command 
 
-# El nombre de la clase debe ser descriptivo
 class TestFleetServiceSaleOrderCreation(TransactionCase):
 
     @classmethod
@@ -14,32 +13,28 @@ class TestFleetServiceSaleOrderCreation(TransactionCase):
         Es más eficiente para crear datos que no cambian entre pruebas.
         """
         super().setUpClass()
-        # Creamos el ecosistema de datos que usaremos en las pruebas
+
         cls.env = cls.env(context=dict(cls.env.context, tracking_disable=True))
 
-        # --- Creación de Datos Base ---
         Partner = cls.env['res.partner']
         cls.partner_customer = Partner.create({'name': 'Cliente de Prueba'})
         cls.partner_insurer = Partner.create({'name': 'Aseguradora de Prueba'})
 
-        # Referencias a productos (confiamos en que existen por los XML de datos)
-        # Nota: Usamos product_variant_id porque es el 'product.product' real.
         cls.product_labor = cls.env.ref('fleet_product.product_template_labor').product_variant_id
         cls.product_labor.write({'taxes_id': [Command.clear()]})
         cls.product_adjustment = cls.env.ref('fleet_product.product_template_insurance_adjustment').product_variant_id
         cls.product_coverage = cls.env.ref('fleet_product.product_template_insurance_coverage').product_variant_id
 
-        # Productos normales para las líneas de repuestos
         cls.product_spare_1 = cls.env['product.product'].create({'name': 'Filtro de Aceite', 'list_price': 50.0, 'standard_price': 25.0})
         cls.product_spare_2 = cls.env['product.product'].create({'name': 'Pastillas de Freno', 'list_price': 120.0, 'standard_price': 70.0})
 
-        # --- Jerarquía de Vehículos ---
+
         VehicleModel = cls.env['fleet.vehicle.model']
         brand = cls.env['fleet.vehicle.model.brand'].create({'name': 'Test Brand'})
         test_model = VehicleModel.create({'name': 'Test Car', 'brand_id': brand.id})
         cls.test_vehicle = cls.env['fleet.vehicle'].create({'model_id': test_model.id})
         
-        # --- Dato para fecha
+ 
         cls.today = date.today()
 
     def test_happy_path_labor_only_no_insurance(self):
