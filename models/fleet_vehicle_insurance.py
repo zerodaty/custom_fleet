@@ -21,17 +21,16 @@ class FleetVehicleInsurance(models.Model):
         )
     active = fields.Boolean(
         default=True,
-        tracking = True
-        ) # Para archivar pólizas vencidas
+        ) 
 
     policy_type = fields.Selection(
         [
-            ('owner', 'Póliza Propietaria'), # Seguro a largo plazo de la empresa
-            #('rental', 'Seguro de Alquiler') # Seguro temporal para un alquiler
-        ], 
+            ('owner', 'Póliza Propietaria'),
+        ],
+        tracking = True,
         string='Tipo de Póliza', 
         required=True, 
-        default='owner' # Por defecto, asumimos que es una póliza de la empresa
+        default='owner'
     )
     
     insurer_id = fields.Many2one(
@@ -49,10 +48,10 @@ class FleetVehicleInsurance(models.Model):
     )
 
     # --- Campos de Vigencia y Costo ---
-    
-    start_date = fields.Date(string='Fecha de Inicio', required=True)
-    end_date = fields.Date(string='Fecha de Vencimiento', required=True)
-    
+
+    start_date = fields.Date(string='Fecha de Inicio', required=True, tracking=True)
+    end_date = fields.Date(string='Fecha de Vencimiento', required=True, tracking=True)
+
     currency_id = fields.Many2one(
         'res.currency', 
         related='vehicle_id.currency_id',
