@@ -1,8 +1,8 @@
 # 🚗 Sistema de Gestión de Taller Mecánico para Odoo 18 (`fleet_product`)
 
-Este módulo transforma la aplicación estándar de Flota de Odoo en un completo sistema de gestión de negocio (ERP) diseñado específicamente para talleres mecánicos. Se extiende la funcionalidad de `fleet`, `sale`, `account` y `analytic` para crear un flujo de trabajo unificado y automatizado, desde la recepción del vehículo hasta la facturación final, pasando por la gestión de seguros y planes de mantenimiento.
+Este módulo transforma la aplicación estándar de Flota de Odoo en un completo sistema de gestión de negocio (ERP) diseñado específicamente para talleres mecánicos. Se extiende la funcionalidad de `fleet`, `sale`, `account` y `analytic` para crear un flujo de trabajo unificado y automatizado, desde la recepción del vehículo hasta la facturación final, pasando por la gestión de seguros y planes de mantenimiento y gestión de servicios.
 
-## ✨ Resumen del Proyecto y la "Magia" implementada
+## ✨ Resumen del Proyecto ✨
 
 El módulo `fleet` de Odoo está diseñado para gestionar una flota de vehículos interna de una empresa. Este proyecto lo rediseña por completo para adaptarlo a un modelo de negocio B2C (Business-to-Consumer), donde el taller presta servicios a vehículos de **clientes externos**.
 
@@ -25,7 +25,7 @@ La "magia" de este módulo reside en la profunda integración y automatización 
 
 ### 2. Sistema Avanzado de Servicios y Costos
 
-- **Costos Desglosados:** El formulario de servicios permite diferenciar entre **costos de mano de obra** y **costos de repuestos**, que se calculan automáticamente.
+- **Costos Desglosados:** El formulario de servicios permite diferenciar entre **costos de mano de obra** y **costos de repuestos** asi como la **poliza del seguro**, que se calculan automáticamente.
 - **Líneas de Productos:** Permite añadir múltiples repuestos a un servicio desde el inventario (`product.product`), detallando cantidad y precio.
 - **Odómetro Inteligente:** Propone el último valor registrado del odómetro al crear un servicio y valida en el backend que no se puedan guardar valores inferiores, previniendo errores humanos.
 
