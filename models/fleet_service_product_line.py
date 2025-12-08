@@ -11,10 +11,13 @@ class FleetServiceProductLine(models.Model):
     _description = 'Product Line for Fleet Services'
     
     
-    @tools.ormcache()
     def _get_default_category_id(self):
-        # Deletion forbidden (at least through unlink)
-        return self.env.ref('fleet_product.product_category_automotriz')
+        """
+        Retorna la categoría de producto por defecto para 'Automotriz'.
+        Este método auxiliar encapsula la referencia al XML ID para mejorar
+        la mantenibilidad y facilitar las pruebas.
+        """
+        return self.env.ref('fleet_product.product_category_automotriz', raise_if_not_found=False)
 
     # El vínculo maestro. Cada línea DEBE pertenecer a un servicio.
     service_id = fields.Many2one(
@@ -62,7 +65,7 @@ class FleetServiceProductLine(models.Model):
     )
     categ_id = fields.Many2one(
         'product.category', 'Product Category',
-        change_default=True, default=_get_default_category_id, group_expand='_read_group_categ_id',
+        change_default=True, default=_get_default_category_id,
         required=True)
     
     # Logica
@@ -79,10 +82,11 @@ class FleetServiceProductLine(models.Model):
         """
         Cuando el usuario selecciona un producto en el formulario,
         este método se ejecuta para autocompletar el precio unitario.
+        Si se deselecciona el producto, el precio unitario se limpia.
         """
-        if not self.product_id:
-            
-            return
+        if self.product_id:
             # 'standard_price' es el nombre técnico del campo 'Costo' en la ficha del producto.
-        self.price_unit = self.product_id.standard_price
+            self.price_unit = self.product_id.standard_price
+        else:
+            self.price_unit = 0.0
         

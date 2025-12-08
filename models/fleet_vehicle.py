@@ -3,23 +3,20 @@ from odoo import models, fields, api
 class FleetVehicle(models.Model):
     _inherit = 'fleet.vehicle'
     
-    # --- CAMPOS PARA CONTRATOS ---
-    maintenance_contract_id = fields.Many2one(
-        'account.analytic.account',
-        string='Plan de Mantenimiento',
-        tracking=True,
-        # El dominio ayuda a los usuarios a seleccionar solo contratos relevantes
-        domain="[('partner_id', '=', customer_id)]"
-    )
-    
-    # --- CAMPOS DE CLIENTE ---
+    # -- Campos de Cliente y Contrato --
     customer_id = fields.Many2one(
         'res.partner',
         string='Propietario / Cliente',
         tracking=True
     )
+    maintenance_contract_id = fields.Many2one(
+        'account.analytic.account',
+        string='Plan de Mantenimiento',
+        tracking=True,
+        domain="[('partner_id', '=', customer_id)]"
+    )
 
-    # --- CAMPOS DE SEGUROS ---
+    # -- Campos de Seguros --
     insurance_policy_ids = fields.One2many(
         'fleet.vehicle.insurance',
         'vehicle_id',
@@ -29,40 +26,36 @@ class FleetVehicle(models.Model):
         string="¿Tiene Pólizas Activas?",
         compute='_compute_has_active_policies'
     )
-    
-    def _get_default_workshop_stage(self):
-        return self.env.ref('fleet_product.workshop_stage_available', raise_if_not_found=False)
-    
+
+    # -- Campos para la Gestión de Taller y Kanban --
     workshop_stage_id = fields.Many2one(
         'fleet.workshop.stage',
         string='Etapa de Taller',
-        default=_get_default_workshop_stage,
-        group_expand='_read_group_expand_full',
+        default=lambda self: self.env.ref('fleet_product.workshop_stage_available', raise_if_not_found=False),
         tracking=True,
         copy=False
     )
-    # Para la vista kanban
-    active_service_count = fields.Integer(compute="_compute_active_service_count", string="Servicios Activos")
-    # Estrellas de la vista kanban
+    active_service_count = fields.Integer(
+        compute="_compute_active_service_count",
+        string="Servicios Activos"
+    )
     priority = fields.Selection(
         [
             ('0', 'Normal'),
             ('1', 'Alta'),
             ('2', 'Urgente')
-        ], 
+        ],
         string='Prioridad',
         default='0',
         tracking=True
     )
-    # Para las alertas de entrega    
     next_delivery_date = fields.Date(
         string="Próxima Entrega",
         compute='_compute_next_delivery_date',
         store=True
     )
 
-
-    # METODOS PARA ASEGURADORAS
+    # -- Métodos de Cómputo --
     @api.depends('insurance_policy_ids')
     def _compute_has_active_policies(self):
         """ Verifica si existen pólizas de tipo 'propietaria' activas. """
@@ -71,15 +64,31 @@ class FleetVehicle(models.Model):
             vehicle.has_active_policies = bool(owner_policies)
 
 
-    # METODO PARA VAINA KANBAN (CAMBIOS PROPIOS)
     @api.depends('log_services.state')
     def _compute_active_service_count(self):
-        """ Cuenta los servicios que están en estado 'Nuevo' o 'En Curso'. """
+        """
+        Cuenta los servicios que están en estado 'Nuevo' o 'En Curso'.
+        Este método está optimizado para evitar problemas de rendimiento N+1.
+        """
+        # Preparamos el dominio para buscar todos los servicios activos de los vehículos en self.
+        domain = [
+            ('vehicle_id', 'in', self.ids),
+            ('state', 'in', ['new', 'running'])
+        ]
+        # Usamos read_group para contar los servicios por vehículo en una sola consulta.
+        service_counts = self.env['fleet.vehicle.log.services'].read_group(
+            domain,
+            fields=['vehicle_id'],
+            groupby=['vehicle_id']
+        )
+        # Mapeamos los resultados a un diccionario para un acceso rápido.
+        count_map = {
+            item['vehicle_id'][0]: item['vehicle_id_count']
+            for item in service_counts
+        }
+        # Asignamos el conteo a cada vehículo. Si no está en el mapa, su conteo es 0.
         for vehicle in self:
-            vehicle.active_service_count = self.env['fleet.vehicle.log.services'].search_count([
-                ('vehicle_id', '=', vehicle.id),
-                ('state', 'in', ['new', 'running']) 
-            ])
+            vehicle.active_service_count = count_map.get(vehicle.id, 0)
 
     def action_open_services(self):
         """
@@ -97,7 +106,6 @@ class FleetVehicle(models.Model):
             'target': 'current',
         }
         
-    # Servicios activos del carro
     @api.depends('log_services.estimated_delivery_date', 'log_services.state')
     def _compute_next_delivery_date(self):
         """
