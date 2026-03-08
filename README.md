@@ -1,4 +1,4 @@
-# 🚗 Sistema de Gestión de Taller Mecánico para Odoo 18 (`fleet_product`)
+# 🚗 Sistema de Gestión de Taller Mecánico para Odoo 18 (`custom_fleet`)
 
 Este módulo transforma la aplicación estándar de Flota de Odoo en un completo sistema de gestión de negocio (ERP) diseñado específicamente para talleres mecánicos. Se extiende la funcionalidad de `fleet`, `sale`, `account` y `analytic` para crear un flujo de trabajo unificado y automatizado, desde la recepción del vehículo hasta la facturación final, pasando por la gestión de seguros y planes de mantenimiento y gestión de servicios.
 
