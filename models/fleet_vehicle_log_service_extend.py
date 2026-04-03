@@ -90,13 +90,19 @@ class FleetVehicleLogServices(models.Model):
                 self.vehicle_id = vehicle
 
     def _get_drivers_with_vehicle_domain(self):
-       """
-       Dominio para el campo purchaser_id
-       Devuelve un filtro que es solo pa los que tienen carro TOCA REVISAR ESTA VAINA Pq no estoy seguro
-       """
-       vehicles_with_driver = self.env['fleet.vehicle'].search([('driver_id', '!=', False)])
-       driver_ids = vehicles_with_driver.mapped('driver_id').ids
-       return [('id', 'in', driver_ids)]
+        """
+        Calcula y devuelve un dominio para el campo `purchaser_id`.
+        El dominio restringe la selección de 'res.partner' a solo aquellos
+        que están asignados como conductores de al menos un vehículo en la flota.
+        Esto asegura que en el registro de servicio solo se puedan seleccionar
+        conductores válidos.
+        """
+        # Busca todos los vehículos que tienen un conductor asignado.
+        vehicles_with_driver = self.env['fleet.vehicle'].search([('driver_id', '!=', False)])
+        # Extrae los IDs de los conductores de esos vehículos.
+        driver_ids = vehicles_with_driver.mapped('driver_id').ids
+        # Retorna el dominio para filtrar el campo 'purchaser_id'.
+        return [('id', 'in', driver_ids)]
     
     sale_order_id = fields.Many2one(
         'sale.order', 
@@ -156,50 +162,18 @@ class FleetVehicleLogServices(models.Model):
         for service in self:
             service.net_cost = service.amount - service.insurance_coverage_amount
     
-    @api.onchange('vehicle_id', 'date')
-    def _onchange_vehicle_set_policy(self):
-        """
-        Cuando se selecciona un vehículo, busca automáticamente la póliza propietaria
-        más relevante (la que vence más tarde pero que ya está activa) y la propone.
-        """
-        if self.vehicle_id and self.date:
-            domain = [
-                ('vehicle_id', '=', self.vehicle_id.id),
-                ('policy_type', '=', 'owner'),
-                ('start_date', '<=', self.date),
-                ('end_date', '>=', self.date),
-            ]
-            relevant_policy = self.env['fleet.vehicle.insurance'].search(domain, order='end_date desc', limit=1)
-            self.insurance_policy_id = relevant_policy
-        else:
-            self.insurance_policy_id = False
+    def _get_product_ref(self, xml_id):
+        """Método auxiliar para obtener una referencia de producto de forma centralizada."""
+        return self.env.ref(f'fleet_product.{xml_id}').product_variant_id
 
-    def action_create_sale_orders(self):
-        """
-        Este método se llama desde el botón 'Crear Presupuesto'.
-        Crea un nuevo Pedido de Venta (sale.order) basado en los datos
-        de este registro de servicio. REVISAR
-        """
-        self.ensure_one() 
-        if self.sale_order_id or self.insurer_sale_order_id:
-            raise UserError("Ya se han generado los documentos de venta para este servicio.")
-        if not self.purchaser_id:
-            raise UserError("Por favor, seleccione un 'Conductor / Cliente' antes de continuar.")
-        
-    
-        if self.insurance_policy_id:
-            if not (self.insurance_policy_id.start_date <= self.date <= self.insurance_policy_id.end_date):
-                raise UserError("La fecha de este servicio está fuera del periodo de vigencia de la póliza de seguro seleccionada.")
-            if self.insurance_coverage_amount > self.insurance_policy_id.cost:
-                raise UserError(f"El monto de la cobertura del seguro ({self.insurance_coverage_amount}) no puede exceder el límite de la póliza ({self.insurance_policy_id.cost}).")
-    
+    def _prepare_client_order_lines(self):
+        """Prepara las líneas del pedido de venta para el cliente."""
         client_order_lines = []
-        
         if self.labor_cost > 0:
-            labor_product = self.env.ref('fleet_product.product_template_labor').product_variant_id
+            labor_product = self._get_product_ref('product_template_labor')
             client_order_lines.append(Command.create({
                 'product_id': labor_product.id,
-                'name': 'Mano de Obra del Servicio: ' + (self.description or ''),
+                'name': f"Mano de Obra del Servicio: {self.description or ''}",
                 'product_uom_qty': 1,
                 'price_unit': self.labor_cost
             }))
@@ -213,32 +187,23 @@ class FleetVehicleLogServices(models.Model):
             }))
             
         if self.insurance_coverage_amount > 0:
-            adjustment_product = self.env.ref('fleet_product.product_template_insurance_adjustment').product_variant_id
+            adjustment_product = self._get_product_ref('product_template_insurance_adjustment')
             client_order_lines.append(Command.create({
                 'product_id': adjustment_product.id,
                 'name': f"Ajuste por Cobertura (Póliza: {self.insurance_policy_id.name})",
                 'product_uom_qty': 1,
                 'price_unit': -self.insurance_coverage_amount
             }))
-            
-        if not client_order_lines:
-             raise UserError("No hay nada que facturar. Añada un costo de mano de obra o productos al servicio.")
-    
-        # Crear SO del Cliente
-        client_so = self.env['sale.order'].create({
-            'partner_id': self.purchaser_id.id,
-            'order_line': client_order_lines,
-            'origin': f"Servicio Flota: {self.description or ''}"
-        })
-        
-        # Crear SO de la Aseguradora (si aplica)
-        insurer_so = False
+        return client_order_lines
+
+    def _create_insurer_sale_order(self):
+        """Crea el pedido de venta para la aseguradora si es necesario."""
         if self.insurance_coverage_amount > 0:
             if not self.insurance_policy_id.insurer_id:
-                raise UserError("La póliza debe tener una compañía aseguradora asociada para poder generar su presupuesto.")
+                raise UserError("La póliza debe tener una compañía aseguradora asociada.")
             
-            coverage_product = self.env.ref('fleet_product.product_template_insurance_coverage').product_variant_id
-            insurer_so = self.env['sale.order'].create({
+            coverage_product = self._get_product_ref('product_template_insurance_coverage')
+            return self.env['sale.order'].create({
                 'partner_id': self.insurance_policy_id.insurer_id.id,
                 'order_line': [Command.create({
                     'product_id': coverage_product.id,
@@ -248,65 +213,96 @@ class FleetVehicleLogServices(models.Model):
                 })],
                 'origin': f"Servicio Flota: {self.description or ''}"
             })
-    
-        # Asignar los nuevos IDs al servicio EN UNA SOLA OPERACIÓN DE ESCRITURA
+        return None
+
+    def _validate_service_for_so_creation(self):
+        """Realiza validaciones antes de crear los pedidos de venta."""
+        if self.sale_order_id or self.insurer_sale_order_id:
+            raise UserError("Ya se han generado los documentos de venta para este servicio.")
+        if not self.purchaser_id:
+            raise UserError("Por favor, seleccione un 'Conductor / Cliente' antes de continuar.")
+        if self.insurance_policy_id:
+            if not (self.insurance_policy_id.start_date <= self.date <= self.insurance_policy_id.end_date):
+                raise UserError("La fecha del servicio está fuera de la vigencia de la póliza.")
+            if self.insurance_coverage_amount > self.insurance_policy_id.cost:
+                raise UserError(f"El monto cubierto ({self.insurance_coverage_amount}) no puede exceder el límite de la póliza ({self.insurance_policy_id.cost}).")
+
+    def action_create_sale_orders(self):
+        """
+        Orquesta la creación de pedidos de venta para el cliente y la aseguradora.
+        Este método está ahora refactorizado para usar métodos auxiliares que
+        simplifican la lógica y mejoran la legibilidad.
+        """
+        self.ensure_one()
+        self._validate_service_for_so_creation()
+
+        client_order_lines = self._prepare_client_order_lines()
+        if not client_order_lines:
+            raise UserError("No hay nada que facturar. Añada mano de obra o productos.")
+
+        client_so = self.env['sale.order'].create({
+            'partner_id': self.purchaser_id.id,
+            'order_line': client_order_lines,
+            'origin': f"Servicio Flota: {self.description or ''}"
+        })
+
+        insurer_so = self._create_insurer_sale_order()
+
         vals_to_write = {'sale_order_id': client_so.id}
         if insurer_so:
             vals_to_write['insurer_sale_order_id'] = insurer_so.id
         
         self.write(vals_to_write)
         return True
-    
-    
-    @api.onchange('vehicle_id')
-    def _onchange_vehicle_id_set_contacts(self):
-        if self.vehicle_id:
-            self.purchaser_id = self.vehicle_id.driver_id
+
+    def _get_workshop_stage(self, xml_id):
+        """Método auxiliar para obtener una etapa de taller de forma centralizada."""
+        return self.env.ref(f'fleet_product.{xml_id}', raise_if_not_found=False)
+
+    def _update_vehicle_workshop_stage(self, new_stage=None):
+        """
+        Actualiza la etapa de taller del vehículo. Si no se proporciona una
+        nueva etapa, se asume que el servicio ha finalizado y se verifica si
+        el vehículo puede volver a estar 'Disponible'.
+        """
+        self.ensure_one()
+        vehicle = self.vehicle_id
+        if not vehicle:
+            return
+
+        if new_stage:
+            vehicle.workshop_stage_id = new_stage
         else:
-            self.purchaser_id = False
+            # Si el servicio termina (done/cancel) y no hay más servicios activos,
+            # el vehículo vuelve a la etapa 'Disponible'.
+            vehicle.invalidate_recordset(['active_service_count'])
+            if vehicle.active_service_count == 0:
+                available_stage = self._get_workshop_stage('workshop_stage_available')
+                vehicle.workshop_stage_id = available_stage
 
     def action_in_progress(self):
         self.ensure_one()
-        # Ahora referenciamos nuestros NUEVOS DATOS del NUEVO MODELO
-        state_available = self.env.ref('fleet_product.workshop_stage_available')
-        state_in_workshop = self.env.ref('fleet_product.workshop_stage_in_workshop')
-        
-        # Y escribimos en nuestro NUEVO CAMPO 'workshop_stage_id'
+        state_available = self._get_workshop_stage('workshop_stage_available')
         if self.vehicle_id.workshop_stage_id == state_available:
-            self.vehicle_id.write({'workshop_stage_id': state_in_workshop.id})
-        
+            state_in_workshop = self._get_workshop_stage('workshop_stage_in_workshop')
+            self._update_vehicle_workshop_stage(new_stage=state_in_workshop)
         self.write({'state': 'running'})
         return True
-    
+
     def action_done(self):
         self.ensure_one()
         if not self.sale_order_id:
-            raise UserError("...")
+            raise UserError("No se puede completar un servicio sin un presupuesto generado.")
         
-        vehicle = self.vehicle_id
         self.write({'state': 'done'})
-        
-        vehicle.invalidate_recordset(['active_service_count'])
-        
-        if vehicle.active_service_count == 0:
-            # Usamos nuestros NUEVOS DATOS
-            state_available = self.env.ref('fleet_product.workshop_stage_available')
-            # Y escribimos en nuestro NUEVO CAMPO
-            vehicle.write({'workshop_stage_id': state_available.id})
-            
+        self._update_vehicle_workshop_stage()
         return True
-    
+
     def action_cancel(self):
         for service in self:
-            vehicle = service.vehicle_id
             # ... tu lógica de cancelar SOs ...
             service.write({'state': 'cancelled'})
-            vehicle.invalidate_recordset(['active_service_count'])
-            if vehicle.active_service_count == 0:
-                # Usamos nuestros NUEVOS DATOS
-                state_available = self.env.ref('fleet_product.workshop_stage_available')
-                # Y escribimos en nuestro NUEVO CAMPO
-                vehicle.write({'workshop_stage_id': state_available.id})
+            service._update_vehicle_workshop_stage()
         return True
 
     def _compute_sale_order_count(self):
@@ -397,21 +393,41 @@ class FleetVehicleLogServices(models.Model):
         help="Cuenta analítica vinculada al contrato aplicado, para seguimiento de costos."
     )
     
-    @api.onchange('vehicle_id')
-    def _onchange_vehicle_id_set_contacts_and_contract(self):
+    @api.onchange('vehicle_id', 'date')
+    def _onchange_vehicle_and_date(self):
+        """
+        Este método unificado gestiona las actualizaciones de campos cuando
+        cambia el vehículo o la fecha del servicio, asegurando que los
+        datos relacionados (conductor, odómetro, contrato, póliza) se
+        mantengan consistentes y actualizados.
+        """
         if self.vehicle_id:
-            # Lógica existente: proponer el contacto
+            # --- Actualizaciones directas desde el vehículo ---
             self.purchaser_id = self.vehicle_id.driver_id
-
             self.odometer = self.vehicle_id.odometer
-
-            # Lógica existente: proponer el plan de mantenimiento
             self.contract_id = self.vehicle_id.maintenance_contract_id
-    
-            # Copiamos el contrato a la cuenta analítica.
             self.analytic_account_id = self.vehicle_id.maintenance_contract_id
-            
+
+            # --- Lógica para encontrar la póliza de seguro relevante ---
+            if self.date:
+                domain = [
+                    ('vehicle_id', '=', self.vehicle_id.id),
+                    ('policy_type', '=', 'owner'),
+                    ('start_date', '<=', self.date),
+                    ('end_date', '>=', self.date),
+                ]
+                # Busca la póliza más relevante (la que vence más tarde pero ya está activa).
+                relevant_policy = self.env['fleet.vehicle.insurance'].search(
+                    domain, order='end_date desc', limit=1
+                )
+                self.insurance_policy_id = relevant_policy
+            else:
+                # Si no hay fecha, no podemos determinar la póliza.
+                self.insurance_policy_id = False
         else:
+            # Si no hay vehículo, reseteamos todos los campos relacionados.
             self.purchaser_id = False
             self.contract_id = False
             self.analytic_account_id = False
+            self.insurance_policy_id = False
+            self.odometer = False # Asumiendo que el odómetro se resetea si no hay vehículo.
